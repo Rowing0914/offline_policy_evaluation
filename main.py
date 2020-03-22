@@ -22,7 +22,6 @@ def single_run(estimators, data_name="ecoli", test_size=0.5):
     """ See Sec 5.1.2 in the paper
 
     :param data_name: a name of a dataset
-    :param model_type: a name of a base algorithm for a policy
     :return reward_est: a dict of estimated rewards by the Estimators of interest
     :return reward_true: a vector of true rewards
     """
