@@ -18,7 +18,7 @@ def _train_policy(policy, x_prod, y_prod, x_targ=None, y_targ=None):
     return policy
 
 
-def single_run(estimators, policies, data_name="ecoli", test_size=0.5):
+def single_run(estimators, data_name="ecoli", test_size=0.5):
     """ See Sec 5.1.2 in the paper
 
     :param data_name: a name of a dataset

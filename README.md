@@ -18,8 +18,8 @@ This repo is to reproduce the result of Doubly Robust Estimator.
 **All data can be found under UCI's great repositories
 
 ## Results
-- [Bias](https://github.com/Rowing0914/doubly_robust_estimator/blob/master/results/result_bias.txt): `./results/result_bias.txt`
-- [RMSE](https://github.com/Rowing0914/doubly_robust_estimator/blob/master/results/result_rmse.txt): `./results/result_rmse.txt`
+- [Bias](https://github.com/Rowing0914/offline_policy_evaluation/blob/master/results/result_bias.txt): `./results/result_bias.txt`
+- [RMSE](https://github.com/Rowing0914/offline_policy_evaluation/blob/master/results/result_rmse.txt): `./results/result_rmse.txt`
 
 
 ## Usage
