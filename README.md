@@ -38,3 +38,4 @@ This repo is to reproduce the result of Doubly Robust Estimator.
 - [Capped IPS/IS](https://www.microsoft.com/en-us/research/wp-content/uploads/2013/11/bottou13a.pdf)
 - [Self Normalised IPS/IS](https://www.cs.cornell.edu/people/tj/publications/swaminathan_joachims_15d.pdf)
 - [Doubly Robust](https://arxiv.org/abs/1103.4601)
+- [Archived Repo](https://github.com/Rowing0914/doubly_robust_estimator)
