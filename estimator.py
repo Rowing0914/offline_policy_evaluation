@@ -1,7 +1,6 @@
 import numpy as np
 from sklearn.linear_model import RidgeCV, LassoCV
 
-from data.data_manager import load_ecoli
 from utils import twoD_gather
 
 
@@ -111,11 +110,18 @@ class InversePropensityScore(BaseEstimator):
 
 
 class DoublyRobustEstimator(BaseEstimator):
-    def __init__(self, ips_estimator: InversePropensityScore, dm_estimator: DirectMethod):
-        """ Doubly Robust Estimator(DR) by Miroslav Dudik et al., 2011 """
+    def __init__(self, ips_estimator, dm_estimator, switch_tau=0.23, switch_flg=None):
+        """ Doubly Robust Estimator(DR) by Miroslav Dudik et al., 2011
+
+        :param ips_estimator: Inverse Propensity Scoring
+        :param dm_estimator: Direct Method
+        :param switch_tau: SWITCH-DR
+        """
         super(DoublyRobustEstimator, self).__init__()
         self.ips_estimator = ips_estimator
         self.dm_estimator = dm_estimator
+        self._switch_tau = switch_tau
+        self._switch_flg = switch_flg
 
     def train(self, context=None, action=None, reward=None):
         """ Train the model parameters given contexts and taken actions by the prod policy """
@@ -135,6 +141,8 @@ class DoublyRobustEstimator(BaseEstimator):
 
 
 if __name__ == '__main__':
+    from data.data_manager import load_ecoli
+
     # load a dataset
     data = load_ecoli()
 
