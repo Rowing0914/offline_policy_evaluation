@@ -154,7 +154,8 @@ if __name__ == '__main__':
     a = np.asarray([prod_policy(row) for row in data.x])
 
     # test the estimator
-    dm = DirectMethod(x=data.x, a=a, r=data.y, model_type="ridge")
+    dm = DirectMethod(model_type="ridge")
+    dm.train(context=data.x, action=a, reward=data.y)
     sample_x = data.x[0]
     sample_y = targ_policy(x=sample_x[:, None])
     reward_est = dm.estimate(context=sample_x[None, :])
