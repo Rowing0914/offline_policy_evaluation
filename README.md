@@ -33,9 +33,14 @@ This repo is to reproduce the result of Doubly Robust Estimator.
 - OS: Windows10, MacOS, Ubuntu(18.04 LTS)
 
 
+## TODO
+- Fuse the evaluation metrics of OPE by Mix and Rank!!
+
+
 ## Reference
 - [IPS/IS](http://www.stat.cmu.edu/~brian/905-2008/papers/Horvitz-Thompson-1952-jasa.pdf)
 - [Capped IPS/IS](https://www.microsoft.com/en-us/research/wp-content/uploads/2013/11/bottou13a.pdf)
 - [Self Normalised IPS/IS](https://www.cs.cornell.edu/people/tj/publications/swaminathan_joachims_15d.pdf)
 - [Doubly Robust](https://arxiv.org/abs/1103.4601)
+- [Mix and Rank: A Framework for Benchmarking Recommender Systems](https://ieeexplore.ieee.org/document/9006199) 
 - [Archived Repo](https://github.com/Rowing0914/doubly_robust_estimator)
