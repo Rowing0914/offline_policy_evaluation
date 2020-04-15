@@ -1,24 +1,21 @@
 import argparse
 from functools import partial
 
-from sklearn.model_selection import train_test_split
-
 from data.data_manager import *
 from estimator import DirectMethod, InversePropensityScore, DoublyRobustEstimator
-from poilcy import UniformPolicy, DeterministicPolicy
-from utils import rmse, aggregator, twoD_gather, prep_for_visualisation, summary_in_txt
+from poilcy import UniformPolicy, DeterministicPolicy, DeterministicPolicy2
+from utils import rmse, aggregator, twoD_gather, prep_for_visualisation, summary_in_txt, train_test_split
 from plot import plot_bar_chart
 from multi_thread import RunInParallel
 from tf_utils import eager_setup
 
 
-def _train_policy(policy, x_prod, y_prod, x_targ=None, y_targ=None):
-    policy.update(x=x_prod, y=y_prod, epochs=1000, batch_size=64, verbose=False)
-    if x_targ and y_targ:
-        action, score = policy.select_action(context=x_targ)
-        pred = np.argmax(score, axis=1)
-        label = np.argmax(y_targ, axis=1)
-        print("Accuracy: {}".format(np.mean(pred == label)))
+def _train_policy(policy, x_train, y_train, x_test=None, y_test=None):
+    policy.update(x=x_train, y=y_train, epochs=1000, batch_size=64, verbose=False)
+    if x_test is not None and y_test is not None:
+        action, score = policy.select_action(context=x_test)
+        label = np.argmax(y_test, axis=-1)
+        print("Accuracy: {}".format(np.mean(action == label)))
     return policy
 
 
@@ -29,43 +26,41 @@ def single_run(estimators, data_name="ecoli", test_size=0.5):
     :return reward_est: a dict of estimated rewards by the Estimators of interest
     :return reward_true: a vector of true rewards
     """
-
     # load the dataset
     data = eval("load_{}()".format(data_name))
 
     # (Acronym) prod: Production, targ: Target
-    x_prod, x_targ, y_prod, y_targ = train_test_split(data.x, data.y_onehot, test_size=test_size)
+    x_train, x_test, y_train, y_test = train_test_split(data=data, test_size=test_size)
 
-    # instantiate and train the prod/targ policies on the training set
-    # TODO: take this part outside and automate the process of experiments
+    # Instantiate and train the prod/targ policies on the training set
     prod_policy = UniformPolicy(num_action=data.num_label)
-    targ_policy = UniformPolicy(num_action=data.num_label)
-    # prod_policy = DeterministicPolicy(num_action=data.num_label, weight_path="./model/{}".format(data_name))
-    # targ_policy = DeterministicPolicy(num_action=data.num_label, weight_path="./model/{}".format(data_name))
+    # prod_policy = DeterministicPolicy2(num_action=data.num_label)
+    # prod_policy = _train_policy(policy=prod_policy, x_train=x_train, y_train=y_train, x_test=x_test, y_test=y_test)
 
-    prod_policy = _train_policy(policy=prod_policy, x_prod=x_prod, y_prod=y_prod)
-    targ_policy = _train_policy(policy=targ_policy, x_prod=x_prod, y_prod=y_prod)
+    # targ_policy = UniformPolicy(num_action=data.num_label)
+    targ_policy = DeterministicPolicy2(num_action=data.num_label)
+    targ_policy = _train_policy(policy=targ_policy, x_train=x_train, y_train=y_train)
 
     # let the policies predict on the test set
-    prod_a_tr, prod_score_tr = prod_policy.select_action(context=x_prod)
-    prod_a_te, prod_score_te = prod_policy.select_action(context=x_targ)
-    targ_a_te, targ_score_te = targ_policy.select_action(context=x_targ)
-    prod_r_te = twoD_gather(y_targ, np.argmax(prod_a_te, axis=-1))
-    reward_true = twoD_gather(y_targ, np.argmax(targ_a_te, axis=-1))
+    prod_a_tr, prod_score_tr = prod_policy.select_action(context=x_train)
+    prod_a_te, prod_score_te = prod_policy.select_action(context=x_test)
+    targ_a_te, targ_score_te = targ_policy.select_action(context=x_test)
+    prod_r_te = twoD_gather(y_test, prod_a_te)
+    # reward_true = twoD_gather(y_test, targ_a_te)
+    reward_true = 1 - np.mean(targ_a_te == np.argmax(y_test, axis=-1))
 
     reward_est = dict()
 
     for name, estimator in estimators.items():
-        estimator.train(context=x_prod, action=prod_a_tr, reward=y_prod)
-        _reward_est = estimator.estimate(context=x_targ,
+        estimator.train(context=x_train, action=prod_a_tr, reward=y_train)
+        _reward_est = estimator.estimate(context=x_test,
                                          prod_r_te=prod_r_te,
                                          prod_a_te=prod_a_te,
                                          targ_a_te=targ_a_te,
                                          prod_score_te=prod_score_te,
                                          targ_score_te=targ_score_te)
+        # construct a dict of the estimated rewards
         reward_est[name] = _reward_est
-
-    # construct a dict of the estimated rewards
     return reward_est, reward_true
 
 
@@ -73,13 +68,14 @@ def _exp(num_episodes, estimators, data_name, verbose=0):
     # Loop for a number of experiments on the single dataset
     rmse_buffer, reward_est_buffer = list(), list()
     for episode in range(num_episodes):
+        print("=== {} ===".format(data_name))
         reward_est, reward_true = single_run(estimators=estimators, data_name=data_name)
-        _rmse = {key: rmse(a=value, b=reward_true) for key, value in reward_est.items()}
+        _rmse = {key: rmse(a=np.mean(value), b=reward_true) for key, value in reward_est.items()}
         rmse_buffer.append(_rmse)
         reward_est_buffer.append(reward_est)
 
-    """ Compute overall bias and RMSE """
-    # aggregate all the results
+    """ Compute overall Bias and RMSE """
+    # aggregate all the results over all the epochs
     _bias_ = aggregator(buffer=reward_est_buffer)
     _rmse_ = aggregator(buffer=rmse_buffer)
 
@@ -136,21 +132,21 @@ def main(num_episodes=500, verbose=0):
     estimators = {
         "DM": DirectMethod(model_type="ridge"),
         "IPS": InversePropensityScore(),
-        "CIPS": InversePropensityScore(cap=10),
+        "CIPS": InversePropensityScore(cap=2),
         "NIPS": InversePropensityScore(if_normalise=True),
-        "NCIPS": InversePropensityScore(cap=10, if_normalise=True),
+        "NCIPS": InversePropensityScore(cap=2, if_normalise=True),
         "DR_IPS": DoublyRobustEstimator(ips_estimator=InversePropensityScore(),
                                         dm_estimator=DirectMethod(model_type="ridge")),
-        "DR_CIPS": DoublyRobustEstimator(ips_estimator=InversePropensityScore(cap=10),
+        "DR_CIPS": DoublyRobustEstimator(ips_estimator=InversePropensityScore(cap=2),
                                          dm_estimator=DirectMethod(model_type="ridge")),
         "DR_NIPS": DoublyRobustEstimator(ips_estimator=InversePropensityScore(if_normalise=True),
                                          dm_estimator=DirectMethod(model_type="ridge")),
-        "DR_NCIPS": DoublyRobustEstimator(ips_estimator=InversePropensityScore(cap=10, if_normalise=True),
+        "DR_NCIPS": DoublyRobustEstimator(ips_estimator=InversePropensityScore(cap=2, if_normalise=True),
                                           dm_estimator=DirectMethod(model_type="ridge")),
     }
 
     # run the whole experiment
-    np.random.seed(10)
+    np.random.seed(1)
     exp(num_episodes=num_episodes, estimators=estimators, verbose=verbose)
 
 

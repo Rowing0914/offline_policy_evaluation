@@ -46,12 +46,12 @@ class DirectMethod(BaseEstimator):
         """ Train the model parameters given contexts and taken actions by the prod policy """
         # Rewards represent the cost of taking actions(e.g., Cost-Sensitive Classification)
         # So, we need to compute y given the taken action by prod policy and the contexts
-        feedback = twoD_gather(reward, np.argmax(action, axis=-1))
+        feedback = twoD_gather(reward, action)
 
         if self._model_type == 'ridge':
-            self._clf = RidgeCV(alphas=self._alpha, fit_intercept=False, cv=5)
+            self._clf = RidgeCV(alphas=self._alpha, fit_intercept=True, cv=5)
         elif self._model_type == 'lasso':
-            self._clf = LassoCV(alphas=self._alpha, tol=1e-3, cv=5, fit_intercept=False)
+            self._clf = LassoCV(alphas=self._alpha, tol=1e-3, cv=5, fit_intercept=True)
         self._clf.fit(context, feedback)
 
     def estimate(self, context=None, prod_r_te=None, prod_a_te=None,
@@ -79,11 +79,11 @@ class InversePropensityScore(BaseEstimator):
                  targ_a_te=None, prod_score_te=None, targ_score_te=None):
         """ Estimate a reward using the inverse propensity score """
         # Apply indicator function
-        bool_mat = np.asarray(np.argmax(prod_a_te, axis=-1) == np.argmax(targ_a_te, axis=-1)).astype(np.float32)
+        bool_mat = np.asarray(prod_a_te == targ_a_te).astype(np.float32)
 
         # take the score only for the taken action
-        targ_score = twoD_gather(targ_score_te, np.argmax(targ_a_te, axis=-1))
-        prod_score = twoD_gather(prod_score_te, np.argmax(targ_a_te, axis=-1))
+        targ_score = twoD_gather(targ_score_te, targ_a_te)
+        prod_score = twoD_gather(prod_score_te, targ_a_te)
 
         # Avoid the division by Zero error
         targ_score[targ_score == 0.0] = np.spacing(1)
@@ -141,22 +141,54 @@ class DoublyRobustEstimator(BaseEstimator):
 
 
 if __name__ == '__main__':
+    from main import _train_policy
+    from utils import rmse, train_test_split
     from data.data_manager import load_ecoli
+    from poilcy import UniformPolicy, DeterministicPolicy2
 
     # load a dataset
     data = load_ecoli()
+    x_train, x_test, y_train, y_test = train_test_split(data=data, test_size=0.5)
 
     # define a prod and a targ policies
-    prod_policy = lambda x: np.eye(data.num_label)[int(np.random.uniform(low=0, high=data.num_label - 1))]
-    targ_policy = lambda x: np.eye(data.num_label)[int(np.random.uniform(low=0, high=data.num_label - 1))]
+    prod_policy = UniformPolicy(num_action=data.num_label)
+    # prod_policy = DeterministicPolicy2(num_action=data.num_label)
+    # prod_policy = _train_policy(policy=prod_policy, x_train=x_train, y_train=y_train, x_test=x_test, y_test=y_test)
+
+    # targ_policy = UniformPolicy(num_action=data.num_label)
+    targ_policy = DeterministicPolicy2(num_action=data.num_label)
+    targ_policy = _train_policy(policy=targ_policy, x_train=x_train, y_train=y_train, x_test=x_test, y_test=y_test)
 
     # get dummy actions
-    a = np.asarray([prod_policy(row) for row in data.x])
+    prod_a_tr, prod_score_tr = prod_policy.select_action(context=x_train)
+    prod_a_te, prod_score_te = prod_policy.select_action(context=x_test)
+    targ_a_te, targ_score_te = targ_policy.select_action(context=x_test)
+    prod_r_te = twoD_gather(y_test, prod_a_te)
 
     # test the estimator
     dm = DirectMethod(model_type="ridge")
-    dm.train(context=data.x, action=a, reward=data.y)
-    sample_x = data.x[0]
-    sample_y = targ_policy(x=sample_x[:, None])
-    reward_est = dm.estimate(context=sample_x[None, :])
-    print("R Est: {}, R True: {}".format(reward_est, data.y[0][np.argmax(sample_y)]))
+    dm.train(context=x_train, action=prod_a_tr, reward=y_train)
+    dm_est = dm.estimate(context=x_test,
+                         prod_r_te=prod_r_te,
+                         prod_a_te=prod_a_te,
+                         targ_a_te=targ_a_te,
+                         prod_score_te=prod_score_te,
+                         targ_score_te=targ_score_te)
+    ground_truth = 1 - np.mean(targ_a_te == np.argmax(y_test, axis=-1))
+    print("[DM] RMSE: {}".format(rmse(a=np.mean(dm_est), b=ground_truth)))
+
+    bool_mat = np.asarray(prod_a_te == targ_a_te).astype(np.float32)
+    # ips_est = prod_r_te * (bool_mat / twoD_gather(prod_score_te, prod_a_te))
+    # ips_est = prod_r_te * (bool_mat / twoD_gather(prod_score_te, targ_a_te))
+    imp_weight = (twoD_gather(targ_score_te, targ_a_te) / twoD_gather(prod_score_te, targ_a_te))
+    ips_est = prod_r_te * (bool_mat * imp_weight)
+    ips_est = np.mean(ips_est)
+    print("[IPS] RMSE: {}".format(rmse(a=np.mean(ips_est), b=ground_truth)))
+
+    r = (prod_r_te - dm_est)
+    # ips_est = r * (bool_mat / twoD_gather(prod_score_te, prod_a_te))
+    # ips_est = r * (bool_mat / twoD_gather(prod_score_te, targ_a_te))
+    imp_weight = (twoD_gather(targ_score_te, targ_a_te) / twoD_gather(prod_score_te, targ_a_te))
+    ips_est = r * (bool_mat * imp_weight)
+    dr_est = ips_est + dm_est
+    print("[DR] RMSE: {}".format(rmse(a=np.mean(dr_est), b=ground_truth)))

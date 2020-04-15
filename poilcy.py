@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+from sklearn.linear_model import LogisticRegression
 
 from tf_utils import create_checkpoint
 
@@ -39,10 +40,7 @@ class UniformPolicy(BasePolicy):
         num_data = context.shape[0]
 
         # sample from Uniform dist
-        action_id = np.random.uniform(low=0, high=self._num_action, size=num_data).astype(np.int8)
-
-        # one-hot vectorise the action indices
-        action = np.eye(self._num_action)[action_id, :]
+        action = np.random.uniform(low=0, high=self._num_action, size=num_data).astype(np.int8)
 
         # work out the scores on each action
         score = np.tile(np.ones(self._num_action) / self._num_action, (num_data, 1))
@@ -107,32 +105,61 @@ class DeterministicPolicy(BasePolicy):
 
         # get an action vector: num_action dim vector with 1 representing the predicted label
         # TODO: think if we really need to one-hot vectorise the action vector
-        action = np.eye(score.shape[1])[np.argmax(score, axis=-1) - 1]
+        action = np.eye(score.shape[1])[np.argmax(score, axis=-1)]
+        return action, score
+
+
+class DeterministicPolicy2(BasePolicy):
+    def __init__(self, num_action):
+        """ Deterministic Policy """
+        super(DeterministicPolicy2, self).__init__(num_action=num_action)
+        self._model = LogisticRegression(fit_intercept=True, max_iter=2000, multi_class="multinomial")
+
+    def update(self, x, y, epochs=300, batch_size=32, verbose=False):
+        """ Learn to be able to select an action given a context """
+        self._model.fit(x, np.argmax(y, axis=-1))
+
+    def select_action(self, context):
+        """ Get scores for each arm(action) given a context and compute an action """
+        # get scores of each action given a context(state in RL literature)
+        score = self._model.predict_proba(context)
+
+        # get an action vector: num_action dim vector with 1 representing the predicted label
+        # TODO: think if we really need to one-hot vectorise the action vector
+        action = self._model.predict(context)
         return action, score
 
 
 if __name__ == '__main__':
     from sklearn.model_selection import train_test_split
     from data.data_manager import load_ecoli
-    from utils import eager_setup
+    from tf_utils import eager_setup
 
     eager_setup()
 
     data = load_ecoli()  # [ecoli] x: (336, 7) y: (336, 8) num_label: 8
-    train_x, test_x, train_y, test_y = train_test_split(data.x, data.y, test_size=0.3)
-    label = np.argmax(test_y, axis=1)
+    x_train, x_test, y_train, y_test = train_test_split(data.x, data.y_onehot, test_size=0.5, random_state=1)
+    label = np.argmax(y_test, axis=-1)
 
     print("=== Test UniformPolicy ===")
     policy = UniformPolicy(num_action=data.num_label)
-    action, score = policy.select_action(context=test_x)
+    action, score = policy.select_action(context=x_test)
     pred = np.argmax(score, axis=1)
     print(np.mean(pred == label))
     print("Taken action: {} Score: {}".format(action.shape, score.shape))
 
-    print("=== Test DeterministicPolicy ===")
-    policy = DeterministicPolicy(num_action=data.num_label, weight_path="./model/{}".format("ecoli"))
-    policy.update(x=train_x, y=train_y, epochs=1000, batch_size=64, verbose=False)
-    action, score = policy.select_action(context=test_x)
+    # print("=== Test DeterministicPolicy ===")
+    # policy = DeterministicPolicy(num_action=data.num_label, weight_path="./model/{}".format("ecoli"))
+    # policy.update(x=train_x, y=train_y, epochs=1000, batch_size=64, verbose=False)
+    # action, score = policy.select_action(context=test_x)
+    # pred = np.argmax(score, axis=1)
+    # print("Accuracy: {}".format(np.mean(pred == label)))
+    # print("Taken action: {} Score: {}".format(action.shape, score.shape))
+
+    print("=== Test DeterministicPolicy2 ===")
+    policy = DeterministicPolicy2(num_action=data.num_label)
+    policy.update(x=x_train, y=y_train, epochs=1000, batch_size=64, verbose=False)
+    action, score = policy.select_action(context=x_test)
     pred = np.argmax(score, axis=1)
     print("Accuracy: {}".format(np.mean(pred == label)))
     print("Taken action: {} Score: {}".format(action.shape, score.shape))
