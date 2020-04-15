@@ -1,11 +1,15 @@
 import argparse
+from functools import partial
 
 from sklearn.model_selection import train_test_split
 
 from data.data_manager import *
 from estimator import DirectMethod, InversePropensityScore, DoublyRobustEstimator
 from poilcy import UniformPolicy, DeterministicPolicy
-from utils import rmse, aggregator, twoD_gather, prep_for_visualisation, summary_in_txt, eager_setup
+from utils import rmse, aggregator, twoD_gather, prep_for_visualisation, summary_in_txt
+from plot import plot_bar_chart
+from multi_thread import RunInParallel
+from tf_utils import eager_setup
 
 
 def _train_policy(policy, x_prod, y_prod, x_targ=None, y_targ=None):
@@ -30,7 +34,7 @@ def single_run(estimators, data_name="ecoli", test_size=0.5):
     data = eval("load_{}()".format(data_name))
 
     # (Acronym) prod: Production, targ: Target
-    x_prod, x_targ, y_prod, y_targ = train_test_split(data.x, data.y, test_size=test_size)
+    x_prod, x_targ, y_prod, y_targ = train_test_split(data.x, data.y_onehot, test_size=test_size)
 
     # instantiate and train the prod/targ policies on the training set
     # TODO: take this part outside and automate the process of experiments
@@ -65,49 +69,63 @@ def single_run(estimators, data_name="ecoli", test_size=0.5):
     return reward_est, reward_true
 
 
-def exp(estimators, num_episodes=500, verbose=0):
-    """ conducts the whole experiments """
+def _exp(num_episodes, estimators, data_name, verbose=0):
+    # Loop for a number of experiments on the single dataset
+    rmse_buffer, reward_est_buffer = list(), list()
+    for episode in range(num_episodes):
+        reward_est, reward_true = single_run(estimators=estimators, data_name=data_name)
+        _rmse = {key: rmse(a=value, b=reward_true) for key, value in reward_est.items()}
+        rmse_buffer.append(_rmse)
+        reward_est_buffer.append(reward_est)
 
-    result_dict = dict()
+    """ Compute overall bias and RMSE """
+    # aggregate all the results
+    _bias_ = aggregator(buffer=reward_est_buffer)
+    _rmse_ = aggregator(buffer=rmse_buffer)
 
-    # Loop for all experiments on all datasets
-    for data_name in names:
-        if data_name == "page-blocks": data_name = "page_blocks"
+    # run one more experiment to compute the bias
+    reward_est, _ = single_run(estimators=estimators, data_name=data_name)
+    dict_bias = {key: np.mean((value / num_episodes) - _value)
+                 for (key, value), (_, _value) in zip(_bias_.items(), reward_est.items())}
+    dict_rmse = {key: value / num_episodes for key, value in _rmse_.items()}
 
-        # Loop for a number of experiments on the single dataset
-        rmse_buffer, reward_est_buffer = list(), list()
-        for episode in range(num_episodes):
-            reward_est, reward_true = single_run(estimators=estimators, data_name=data_name)
-            _rmse = {key: rmse(a=value, b=reward_true) for key, value in reward_est.items()}
-            rmse_buffer.append(_rmse)
-            reward_est_buffer.append(reward_est)
-
-            if verbose:
-                for key, value in reward_est.items():
-                    print("[{}] RMSE: {}".format(key, rmse(a=value, b=reward_true)))
-
-        """ Compute overall bias and RMSE """
-        # aggregate all the results
-        _bias_ = aggregator(buffer=reward_est_buffer)
-        _rmse_ = aggregator(buffer=rmse_buffer)
-
-        # run one more experiment to compute the bias
-        reward_est, _ = single_run(estimators=estimators, data_name=data_name)
-        bias_dict = {key: np.mean((value / num_episodes) - _value)
-                     for (key, value), (_, _value) in zip(_bias_.items(), reward_est.items())}
-        rmse_dict = {key: value / num_episodes for key, value in _rmse_.items()}
-
-        for (key, value_bias), (_, value_rmse) in zip(bias_dict.items(), rmse_dict.items()):
+    if verbose:
+        for (key, value_bias), (_, value_rmse) in zip(dict_bias.items(), dict_rmse.items()):
             print("[{}: {}] RMSE over {}-run: {}".format(data_name, key, num_episodes, value_rmse))
             print("[{}: {}] Bias over {}-run: {}".format(data_name, key, num_episodes, value_bias))
 
-        result_dict[data_name] = {"bias": bias_dict, "rmse": rmse_dict}
+    return dict_bias, dict_rmse
+
+
+def exp(estimators, num_episodes=500, verbose=0):
+    """ conducts the whole experiments """
+
+    fn_names, fns = list(), list()
+
+    # Loop for all experiments on all datasets
+    for data_name in DATASET_NAMES:
+        if data_name == "page-blocks": data_name = "page_blocks"
+
+        def _fn(_data_name):
+            dict_bias, dict_rmse = _exp(num_episodes=num_episodes,
+                                        estimators=estimators,
+                                        data_name=_data_name,
+                                        verbose=verbose)
+            return dict_bias, dict_rmse
+
+        fn_names.append(data_name)
+        _fn = partial(_fn, _data_name=data_name)
+        fns.append(_fn)
+
+    # Run the estimators in parallel
+    results = RunInParallel(fn_names=fn_names, fns=fns)
 
     # Summarise the results
-    bias_df = prep_for_visualisation(_dict=result_dict, _metric_name="bias")
-    rmse_df = prep_for_visualisation(_dict=result_dict, _metric_name="rmse")
-    summary_in_txt(df=bias_df, _metric_name="bias")
-    summary_in_txt(df=rmse_df, _metric_name="rmse")
+    df_bias, df_rmse = prep_for_visualisation(results=results, data_names=DATASET_NAMES, est_names=estimators.keys())
+    summary_in_txt(df=df_bias, _metric_name="bias")
+    summary_in_txt(df=df_rmse, _metric_name="rmse")
+    plot_bar_chart(df=df_bias, plot_name="Bias", fig_name="bias.png")
+    plot_bar_chart(df=df_rmse, plot_name="RMSE", fig_name="rmse.png")
 
 
 def main(num_episodes=500, verbose=0):
@@ -132,6 +150,7 @@ def main(num_episodes=500, verbose=0):
     }
 
     # run the whole experiment
+    np.random.seed(10)
     exp(num_episodes=num_episodes, estimators=estimators, verbose=verbose)
 
 

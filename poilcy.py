@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from utils import create_checkpoint
+from tf_utils import create_checkpoint
 
 
 class BasePolicy(object):

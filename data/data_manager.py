@@ -5,16 +5,17 @@ Converts the dataset into X(features) and Y(labels: numerical values) format.
 import pandas as pd
 import numpy as np
 
-from data.abs_path import ROOT_DIR
+from data import ROOT_DIR
 
 # all names of the datasets
-names = ["ecoli", "glass", "letter", "optdigits", "page-blocks", "pendigits", "satimage", "vehicle", "yeast"]
+DATASET_NAMES = ["ecoli", "glass", "letter", "optdigits", "page-blocks", "pendigits", "satimage", "vehicle", "yeast"]
 
 
 class Data(object):
     def __init__(self):
         self.x = None
         self.y = None
+        self.y_onehot = None
         self.load_data()
         self.relabelling()
         self.one_hot_vectorise()
@@ -32,15 +33,21 @@ class Data(object):
 
     def one_hot_vectorise(self):
         num_label = len(np.unique(self.y))
-        self.y = np.eye(num_label)[self.y - 1]
+        self.y_onehot = np.eye(num_label)[self.y - 1]
 
     @property
     def num_label(self):
-        return self.y.shape[1]
+        if self.y_onehot is not None:
+            return self.y_onehot.shape[1]
+        else:
+            return self.y.shape[1]
 
     @property
     def unique_label(self):
-        return np.unique(self.y)
+        if self.y_onehot is not None:
+            return np.unique(self.y_onehot)
+        else:
+            return np.unique(self.y)
 
 
 class load_ecoli(Data):
@@ -111,7 +118,7 @@ class load_yeast(Data):
 
 
 if __name__ == '__main__':
-    for name in names:
+    for name in DATASET_NAMES:
         if name == "page-blocks":
             name = "page_blocks"
         data = eval("load_{}()".format(name))
