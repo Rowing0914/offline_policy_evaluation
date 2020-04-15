@@ -12,13 +12,15 @@ DATASET_NAMES = ["ecoli", "glass", "letter", "optdigits", "page-blocks", "pendig
 
 
 class Data(object):
-    def __init__(self):
+    def __init__(self, if_noisy=False):
         self.x = None
         self.y = None
         self.y_onehot = None
         self.load_data()
         self.relabelling()
         self.one_hot_vectorise()
+        if if_noisy:
+            self.add_noise()
 
     def load_data(self):
         raise NotImplementedError()
@@ -34,6 +36,15 @@ class Data(object):
     def one_hot_vectorise(self):
         num_label = len(np.unique(self.y))
         self.y_onehot = np.eye(num_label)[self.y - 1]
+
+    def add_noise(self):
+        """ In addition to this deterministic reward model, we also consider
+            a noisy reward model for each data set, which reveals the correct reward
+            with probability 0.5 and outputs a random coin toss otherwise.
+            Theoretically, this should lead to bigger std and larger variance in all estimators.
+        """
+        mask = np.random.random(size=self.y.shape[0]) > 0.5
+        self.y_onehot[~mask] = np.random.binomial(n=1, p=0.5, size=self.y_onehot[~mask].shape)
 
     @property
     def num_label(self):
@@ -118,8 +129,16 @@ class load_yeast(Data):
 
 
 if __name__ == '__main__':
+    print("=== Without Noise ===")
     for name in DATASET_NAMES:
         if name == "page-blocks":
             name = "page_blocks"
         data = eval("load_{}()".format(name))
+        print("[{}] x: {} y: {} num_label: {}".format(name, data.x.shape, data.y.shape, data.num_label))
+
+    print("=== With Noise ===")
+    for name in DATASET_NAMES:
+        if name == "page-blocks":
+            name = "page_blocks"
+        data = eval("load_{}(if_noisy=True)".format(name))
         print("[{}] x: {} y: {} num_label: {}".format(name, data.x.shape, data.y.shape, data.num_label))
