@@ -130,6 +130,5 @@ dmypy.json
 
 .idea
 .DS_Store
-bias.png
 data/NAVER
 model

@@ -124,8 +124,8 @@ def exp(estimators, num_episodes=500, verbose=0):
     df_bias, df_rmse = prep_for_visualisation(results=results, data_names=DATASET_NAMES, est_names=estimators.keys())
     summary_in_txt(df=df_bias, _metric_name="bias")
     summary_in_txt(df=df_rmse, _metric_name="rmse")
-    plot_bar_chart(df=df_bias, plot_name="Bias", fig_name="bias.png")
-    plot_bar_chart(df=df_rmse, plot_name="RMSE", fig_name="rmse.png")
+    plot_bar_chart(df=df_bias, plot_name="Bias", fig_name="./results/bias.png")
+    plot_bar_chart(df=df_rmse, plot_name="RMSE", fig_name="./results/rmse.png")
 
 
 def main(num_episodes=500, verbose=0):
