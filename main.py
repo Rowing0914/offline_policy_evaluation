@@ -2,7 +2,7 @@ import argparse
 from functools import partial
 
 from data.data_manager import *
-from estimator import DirectMethod, InversePropensityScore, DoublyRobustEstimator
+from estimator import DM, IPS, DR
 from poilcy import UniformPolicy, DeterministicPolicy, DeterministicPolicy2
 from utils import rmse, aggregator, twoD_gather, prep_for_visualisation, summary_in_txt, train_test_split
 from plot import plot_bar_chart
@@ -130,19 +130,19 @@ def main(num_episodes=500, verbose=0):
 
     # Prepare all the estimators
     estimators = {
-        "DM": DirectMethod(model_type="ridge"),
-        "IPS": InversePropensityScore(),
-        "CIPS": InversePropensityScore(cap=2),
-        "NIPS": InversePropensityScore(if_normalise=True),
-        "NCIPS": InversePropensityScore(cap=2, if_normalise=True),
-        "DR_IPS": DoublyRobustEstimator(ips_estimator=InversePropensityScore(),
-                                        dm_estimator=DirectMethod(model_type="ridge")),
-        "DR_CIPS": DoublyRobustEstimator(ips_estimator=InversePropensityScore(cap=2),
-                                         dm_estimator=DirectMethod(model_type="ridge")),
-        "DR_NIPS": DoublyRobustEstimator(ips_estimator=InversePropensityScore(if_normalise=True),
-                                         dm_estimator=DirectMethod(model_type="ridge")),
-        "DR_NCIPS": DoublyRobustEstimator(ips_estimator=InversePropensityScore(cap=2, if_normalise=True),
-                                          dm_estimator=DirectMethod(model_type="ridge")),
+        "DM": DM(model_type="ridge"),
+        "IPS": IPS(),
+        "CIPS": IPS(if_cap=True, _min=0, _max=10),
+        "NIPS": IPS(if_normalise=True),
+        "NCIPS": IPS(if_cap=True, _min=0, _max=10, if_normalise=True),
+        "Pointwise-NCIPS": IPS(if_cap=True, _min=0, _max=10, if_normalise=True, if_pointwise=True),
+        "DR-IPS": DR(ips=IPS(), dm=DM(model_type="ridge")),
+        "DR-CIPS": DR(ips=IPS(if_cap=True, _min=0, _max=10), dm=DM(model_type="ridge")),
+        "DR-NCIPS": DR(ips=IPS(if_cap=True, _min=0, _max=10, if_normalise=True), dm=DM(model_type="ridge")),
+        "SWITCH-IPS": DR(ips=IPS(), dm=DM(model_type="ridge"), switch_tau=2.0, switch_flg="IPS"),
+        "SWITCH-DR": DR(ips=IPS(), dm=DM(model_type="ridge"), switch_tau=2.0, switch_flg="DR"),
+        "CAB": DR(ips=IPS(), dm=DM(model_type="ridge"), cab_coeff=2.0, cab_flg=""),
+        "CAB-DR": DR(ips=IPS(), dm=DM(model_type="ridge"), cab_coeff=2.0, cab_flg="DR")
     }
 
     # run the whole experiment
