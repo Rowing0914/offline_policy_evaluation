@@ -15,7 +15,7 @@ This repo is to reproduce the result of Doubly Robust Estimator.
 |     vehicle |     846 |       18 |      4 |
 |       yeast |    1484 |        8 |     10 |
 
-**All data can be found under UCI's great repositories
+**All data can be found under [UCI's great repositories](https://github.com/Rowing0914/offline_policy_evaluation/blob/master/data/README.md)
 
 ## Results
 - [Bias](https://github.com/Rowing0914/offline_policy_evaluation/blob/master/results/result_bias.txt): `./results/result_bias.txt`
@@ -43,4 +43,3 @@ This repo is to reproduce the result of Doubly Robust Estimator.
 - [Self Normalised IPS/IS](https://www.cs.cornell.edu/people/tj/publications/swaminathan_joachims_15d.pdf)
 - [Doubly Robust](https://arxiv.org/abs/1103.4601)
 - [Mix and Rank: A Framework for Benchmarking Recommender Systems](https://ieeexplore.ieee.org/document/9006199) 
-- [Archived Repo](https://github.com/Rowing0914/doubly_robust_estimator)
