@@ -41,7 +41,7 @@ This repo is to reproduce the result of Doubly Robust Estimator.
 - [IPS/IS](http://www.stat.cmu.edu/~brian/905-2008/papers/Horvitz-Thompson-1952-jasa.pdf)
     - [Capped IPS/IS](https://www.microsoft.com/en-us/research/wp-content/uploads/2013/11/bottou13a.pdf)
     - [Self Normalised IPS/IS](https://www.cs.cornell.edu/people/tj/publications/swaminathan_joachims_15d.pdf)
-    - [Pointwise IPS](Offline A/B testing for Recommender Systems)
+    - [Pointwise IPS](https://arxiv.org/pdf/1801.07030.pdf)
 - [Doubly Robust](https://arxiv.org/abs/1103.4601)
     - [SWITCH](https://arxiv.org/pdf/1612.01205.pdf)
     - [Continuous Adaptive Blending](http://proceedings.mlr.press/v97/su19a/su19a.pdf)
