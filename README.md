@@ -23,6 +23,7 @@ This repo is to reproduce the result of Doubly Robust Estimator.
 
 
 ## Usage
+- If Anaconda, please create your env: `conda create -n <ENV_NAME> python=3.6.8`
 - Get dependencies: `pip install -r requirements.txt`
 - Run the main file: `python main.py`
 
@@ -30,7 +31,7 @@ This repo is to reproduce the result of Doubly Robust Estimator.
 ## Dependencies
 - Python: 3.6.8
 - Packages: See `./requirements.txt`
-- OS: Windows10, MacOS, Ubuntu(18.04 LTS)
+- OS: Windows10, MacOS, Ubuntu(18.04/16.04 LTS)
 
 
 ## TODO
