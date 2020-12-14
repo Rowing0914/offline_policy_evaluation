@@ -42,7 +42,8 @@ class Data(object):
 
     def one_hot_vectorise(self):
         num_label = len(np.unique(self.y))
-        self.y_onehot = np.eye(num_label)[self.y]
+        # self.y_onehot = np.eye(num_label)[self.y]
+        self.y_onehot = np.abs(np.eye(num_label)[self.y] - 1)
 
     def add_noise(self):
         """ In addition to this deterministic reward model, we also consider
