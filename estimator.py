@@ -52,11 +52,18 @@ class DM(BaseEstimator):
             self._clf = RidgeCV(alphas=self._alpha, fit_intercept=True, cv=5)
         elif self._model_type == 'lasso':
             self._clf = LassoCV(alphas=self._alpha, tol=1e-3, cv=5, fit_intercept=True)
+        """ This is the part described by the DR paper(Sec 2.1) as follows
+             > A problem with this method is that the estimate is formed without the knowledge of a policy
+        """
         self._clf.fit(context, feedback)
 
     def estimate(self, context=None, prod_r_te=None, prod_a_te=None,
                  targ_a_te=None, prod_score_te=None, targ_score_te=None):
-        """ Estimate a reward given a context """
+        """ Estimate a reward given a context
+            
+            This is the part described by the DR paper(Sec 2.1) as follows
+             > A problem with this method is that the estimate is formed without the knowledge of a policy
+        """
         reward_est = self._clf.predict(X=context)
         return reward_est.flatten()
 
